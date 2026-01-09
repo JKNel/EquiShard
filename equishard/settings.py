@@ -156,3 +156,13 @@ CORS_ALLOWED_ORIGINS: List[str] = [
     origin.strip()
     for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 ]
+
+# CSRF Settings (Critical for Production)
+CSRF_TRUSTED_ORIGINS: List[str] = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,https://equishard.com').split(',')
+]
+
+# Proxy Configuration (For Coolify/Traefik)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
