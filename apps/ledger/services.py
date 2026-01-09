@@ -132,13 +132,27 @@ class LedgerService:
         if amount <= 0:
             raise LedgerError("Faucet amount must be positive")
 
+        # 1. Determine Tenant Scope
+        tenant = user.tenant
+        if not tenant:
+            if user.is_superuser or user.is_staff:
+                from apps.users.models import Tenant
+                tenant = Tenant.objects.first()
+                if not tenant:
+                    raise LedgerError("System has no tenants. Cannot process transaction.")
+            else:
+                raise LedgerError(f"User {user.username} does not belong to any tenant.")
+
+        # 2. Get or Create User Wallet
         wallet = LedgerService.get_user_wallet(user)
         if not wallet:
-            raise LedgerError(f"No wallet found for user {user.username}")
+            # Auto-create wallet if missing (common for admin or new users)
+            wallet = LedgerService.create_user_wallet(user=user, tenant=tenant)
 
-        reserve = LedgerService.get_system_reserve(user.tenant)
+        reserve = LedgerService.get_system_reserve(tenant)
         if not reserve:
-            raise LedgerError(f"No system reserve for tenant {user.tenant.slug}")
+            # Try to create reserve if missing
+            reserve = LedgerService.create_system_reserve(tenant=tenant)
 
         # Create journal entry
         entry = JournalEntry.objects.create(

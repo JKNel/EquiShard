@@ -250,6 +250,7 @@
             const data = await response.json();
             showToast(`Added $1,000 to your wallet! New balance: $${data.new_balance}`, 'success');
             loadDashboard();
+            updateBalance(); // Refresh header balance
         } catch (e) {
             showToast('Failed to add funds: ' + e.message, 'error');
         }
