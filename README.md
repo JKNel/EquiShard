@@ -124,18 +124,26 @@ equishard/
 ├── equishard/          # Django config
 │   ├── settings.py
 │   ├── asgi.py         # CQRS router
-│   └── urls.py
+│   ├── urls.py
+│   ├── views.py
+│   └── wsgi.py
 ├── apps/               # Domain Layer (Commands)
 │   ├── users/          # Identity context
 │   ├── ledger/         # Double-entry banking
 │   └── catalog/        # Assets & inventory
 ├── api/                # Query Layer (FastAPI)
+│   ├── main.py
+│   ├── dependencies.py
 │   └── v1/
 │       ├── analytics.py
 │       └── store.py
 ├── shared/             # Shared Kernel
 │   ├── abac/           # Policy engine
 │   └── utils/          # Helpers
+├── templates/          # Django Templates
+│   ├── base.html
+│   ├── home.html
+│   └── ...
 ├── scripts/
 │   └── seed.py
 ├── Dockerfile
