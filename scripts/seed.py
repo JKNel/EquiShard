@@ -266,15 +266,18 @@ def seed():
     print("EquiShard Database Seeding")
     print("=" * 60)
     
+    # Always check/ensure admin exists first (Idempotent)
+    create_admin()
+
     # Check if data already exists
     if Tenant.objects.exists():
-        print("\n⚠️  Data already exists. Skipping seed.")
-        print("   To re-seed, run: python manage.py flush")
+        print("\n⚠️  Tenants already exist. Skipping asset/user generation.")
+        print("   To re-seed fully, run: python manage.py flush")
         return
     
     tenants = create_tenants()
     users = create_users(tenants)
-    create_admin()
+    # Admin created above
     assets = create_assets(tenants)
     create_price_history(assets)
     simulate_trades(users, assets)
