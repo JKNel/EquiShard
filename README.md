@@ -108,26 +108,13 @@ curl http://localhost:8000/api/v1/analytics/summary \
 | `/api/v1/analytics/allocation` | GET | Allocation pie chart |
 | `/api/v1/analytics/summary` | GET | Portfolio summary |
 
-## 🐳 Deployment (Coolify)
-
-1. Push to your Git repository
-2. In Coolify, create a new service from your repo
-3. Select "Dockerfile" as the build method
-4. Set environment variables:
-   - `DATABASE_URL` - Your Supabase connection string
-   - `SECRET_KEY` - A secure random string
-   - `DEBUG` - `False`
-   - `ALLOWED_HOSTS` - Your domain
-
 ## 🧪 Test Credentials
 
-After running the seed script:
-
-| Username | Password | Tenant | Accredited |
-|----------|----------|--------|------------|
-| investor1_alpha | password123 | Alpha | No |
-| investor2_alpha | password123 | Alpha | No |
-| vip_investor_alpha | password123 | Alpha | Yes |
+| Username | Password | Role |
+|----------|----------|------|
+| `admin` | `password123` | **Superuser** / Admin Panel |
+| `investor1_alpha` | `password123` | Regular Investor (Alpha) |
+| `vip_investor_alpha` | `password123` | VIP Investor (Alpha) |
 
 ## 📁 Project Structure
 
