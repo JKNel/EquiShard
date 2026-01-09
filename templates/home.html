@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1>Invest in Tomorrow,<br><span class="text-es-yellow">One Share at a Time</span></h1>
+                <p class="lead mt-4">Access premium investment opportunities with fractional ownership. Real estate,
+                    tech stocks, commodities, and more — all starting from just $10.</p>
+                <div class="mt-4">
+                    <a href="/marketplace/" class="btn btn-warning btn-lg me-2">
+                        <i class="bi bi-shop"></i> Browse Marketplace
+                    </a>
+                    <a href="/api/docs" class="btn btn-outline-light btn-lg" target="_blank">
+                        <i class="bi bi-code-slash"></i> API Docs
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6 d-none d-lg-block text-center">
+                <i class="bi bi-graph-up-arrow display-1 text-es-yellow" style="font-size: 12rem; opacity: 0.3;"></i>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4" id="statsRow">
+            <div class="col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-value" id="statAssets">-</div>
+                    <div class="stat-label">Available Assets</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-value" id="statMarketCap">-</div>
+                    <div class="stat-label">Total Market Cap</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-value" id="statInvestors">-</div>
+                    <div class="stat-label">Active Investors</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card text-center">
+                    <div class="stat-value text-es-yellow" id="statVolume">-</div>
+                    <div class="stat-label">24h Volume</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Assets Section -->
+<section class="py-5 bg-white">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-star-fill text-es-yellow"></i> Featured Assets</h2>
+            <a href="/marketplace/" class="btn btn-outline-primary">View All <i class="bi bi-arrow-right"></i></a>
+        </div>
+
+        <div class="row g-4" id="featuredAssets">
+            <div class="loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Asset Types Section -->
+<section class="py-5">
+    <div class="container">
+        <h2 class="text-center mb-4">Investment Categories</h2>
+        <div class="row g-4" id="assetTypes">
+            <!-- Loaded dynamically -->
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="py-5 bg-es-blue text-white">
+    <div class="container text-center">
+        <h2>Ready to Start Investing?</h2>
+        <p class="lead">Create an account and get started with as little as $10</p>
+        <a href="#" class="btn btn-warning btn-lg mt-3" id="getStartedBtn" data-bs-toggle="modal"
+            data-bs-target="#loginModal">
+            <i class="bi bi-rocket-takeoff"></i> Get Started
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Load market stats
+    async function loadStats() {
+        try {
+            const stats = await apiGet('/api/v1/store/stats');
+            document.getElementById('statAssets').textContent = stats.total_assets;
+            document.getElementById('statMarketCap').textContent = '$' + (stats.total_market_cap / 1000000).toFixed(1) + 'M';
+            document.getElementById('statInvestors').textContent = stats.total_investors;
+            document.getElementById('statVolume').textContent = '$' + stats.total_volume_24h.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        } catch (e) {
+            console.error('Failed to load stats:', e);
+        }
+    }
+
+    // Load featured assets
+    async function loadFeaturedAssets() {
+        try {
+            const assets = await apiGet('/api/v1/store/assets?limit=8');
+            const container = document.getElementById('featuredAssets');
+            container.innerHTML = assets.map(asset => `
+                <div class="col-md-3">
+                    <div class="card card-asset" onclick="window.location='/asset/${asset.id}/'">
+                        <img src="${asset.image_url || '/static/images/placeholder.jpg'}" class="card-img-top" alt="${asset.name}" onerror="this.src='https://via.placeholder.com/300x160?text=${encodeURIComponent(asset.symbol)}'">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="asset-type-badge">${asset.asset_type}</span>
+                                ${asset.accreditation_required ? '<span class="accredited-badge">VIP</span>' : ''}
+                            </div>
+                            <h6 class="card-title mb-1">${asset.name}</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-bold text-es-blue">$${asset.valuation.toLocaleString()}</span>
+                                <span class="risk-badge risk-${asset.risk_level}">Risk ${asset.risk_level}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to load assets:', e);
+        }
+    }
+
+    // Load asset types
+    async function loadAssetTypes() {
+        try {
+            const types = await apiGet('/api/v1/store/asset-types');
+            const icons = {
+                'REAL_ESTATE': 'bi-building',
+                'TECH_STOCKS': 'bi-cpu',
+                'COMMODITIES': 'bi-gem',
+                'PRIVATE_EQUITY': 'bi-briefcase',
+                'BONDS': 'bi-bank',
+                'ART': 'bi-palette'
+            };
+            const container = document.getElementById('assetTypes');
+            container.innerHTML = types.map(type => `
+                <div class="col-md-4 col-lg-2">
+                    <a href="/marketplace/?type=${type.value}" class="text-decoration-none">
+                        <div class="stat-card text-center">
+                            <i class="bi ${icons[type.value] || 'bi-graph-up'} display-5 text-es-blue mb-2"></i>
+                            <div class="fw-semibold">${type.label}</div>
+                            <small class="text-muted">${type.count} assets</small>
+                        </div>
+                    </a>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Failed to load asset types:', e);
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStats();
+        loadFeaturedAssets();
+        loadAssetTypes();
+        updateGetStartedButton();
+    });
+
+    function updateGetStartedButton() {
+        if (localStorage.getItem('access_token')) {
+            const btn = document.getElementById('getStartedBtn');
+            if (btn) {
+                btn.href = '/marketplace/';
+                btn.removeAttribute('data-bs-toggle');
+                btn.removeAttribute('data-bs-target');
+                btn.innerHTML = '<i class="bi bi-shop"></i> Browse Marketplace';
+            }
+        }
+    }
+</script>
+{% endblock %}

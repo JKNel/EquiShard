@@ -1,0 +1,1 @@
+"""EquiShard Django project package."""

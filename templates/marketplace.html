@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block title %}Marketplace{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <!-- Filters Sidebar -->
+        <div class="col-lg-3">
+            <div class="card mb-4">
+                <div class="card-header bg-es-blue text-white">
+                    <i class="bi bi-funnel"></i> Filters
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Asset Type</label>
+                        <select class="form-select" id="filterType" onchange="goToPage(1)">
+                            <option value="">All Types</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Risk Level</label>
+                        <select class="form-select" id="filterRisk" onchange="goToPage(1)">
+                            <option value="">Any Risk</option>
+                            <option value="1">1 - Very Low</option>
+                            <option value="2">2 - Low</option>
+                            <option value="3">3 - Medium</option>
+                            <option value="4">4 - High</option>
+                            <option value="5">5 - Very High</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Sort By</label>
+                        <select class="form-select" id="sortBy" onchange="goToPage(1)">
+                            <option value="name">Name</option>
+                            <option value="valuation">Price</option>
+                            <option value="risk_level">Risk Level</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Order</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="order" id="orderAsc" value="asc" checked
+                                onchange="goToPage(1)">
+                            <label class="btn btn-outline-primary" for="orderAsc"><i
+                                    class="bi bi-sort-alpha-down"></i></label>
+                            <input type="radio" class="btn-check" name="order" id="orderDesc" value="desc"
+                                onchange="goToPage(1)">
+                            <label class="btn btn-outline-primary" for="orderDesc"><i
+                                    class="bi bi-sort-alpha-up"></i></label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Items per page</label>
+                        <select class="form-select" id="pageSize" onchange="goToPage(1)">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-warning w-100" onclick="resetFilters()">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Market Stats -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-bar-chart"></i> Market Stats
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Total Assets</span>
+                        <span class="fw-bold" id="totalAssets">-</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Market Cap</span>
+                        <span class="fw-bold" id="marketCap">-</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">24h Volume</span>
+                        <span class="fw-bold text-es-yellow" id="volume24h">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Asset Grid -->
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-shop text-es-blue"></i> Marketplace</h2>
+                <span class="text-muted" id="assetCount">Loading...</span>
+            </div>
+
+            <div class="row g-4" id="assetGrid">
+                <div class="loading-spinner">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <nav class="mt-4" id="paginationNav" style="display: none;">
+                <ul class="pagination justify-content-center" id="pagination">
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    // Pagination state
+    let currentPage = 1;
+    let totalAssets = 0;
+
+    // Track chart instances to destroy them before re-rendering
+    let chartInstances = {};
+
+    // Load asset types for filter dropdown
+    async function loadAssetTypeFilter() {
+        try {
+            const types = await apiGet('/api/v1/store/asset-types');
+            const select = document.getElementById('filterType');
+            types.forEach(t => {
+                const option = document.createElement('option');
+                option.value = t.value;
+                option.textContent = `${t.label} (${t.count})`;
+                select.appendChild(option);
+            });
+
+            // Check URL params for pre-selected type
+            const urlParams = new URLSearchParams(window.location.search);
+            const type = urlParams.get('type');
+            if (type) {
+                select.value = type;
+            }
+        } catch (e) {
+            console.error('Failed to load asset types:', e);
+        }
+    }
+
+    // Go to specific page
+    function goToPage(page) {
+        currentPage = page;
+        loadAssets();
+    }
+
+    // Load assets with pagination
+    async function loadAssets() {
+        const container = document.getElementById('assetGrid');
+        container.innerHTML = '<div class="loading-spinner"><div class="spinner-border text-primary" role="status"></div></div>';
+
+        const type = document.getElementById('filterType').value;
+        const risk = document.getElementById('filterRisk').value;
+        const sortBy = document.getElementById('sortBy').value;
+        const order = document.querySelector('input[name="order"]:checked').value;
+        const limit = parseInt(document.getElementById('pageSize').value);
+        const offset = (currentPage - 1) * limit;
+
+        let url = `/api/v1/store/assets?sort_by=${sortBy}&order=${order}&limit=${limit}&offset=${offset}`;
+        if (type) url += `&asset_type=${type}`;
+        if (risk) url += `&risk_level=${risk}`;
+
+        try {
+            const assets = await apiGet(url);
+
+            // Update asset count display
+            const pageStart = offset + 1;
+            const pageEnd = offset + assets.length;
+            document.getElementById('assetCount').textContent = `Showing ${pageStart}-${pageEnd} of ${totalAssets || assets.length} assets`;
+
+            if (assets.length === 0) {
+                container.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="bi bi-inbox display-4"></i><p>No assets match your filters</p></div>';
+                document.getElementById('paginationNav').style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = assets.map(asset => `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card card-asset h-100" onclick="window.location='/asset/${asset.id}/'">
+                        <div class="card-img-top p-3 bg-light" style="height: 160px; position: relative;">
+                            <canvas id="miniChart-${asset.id}"></canvas>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="asset-type-badge">${asset.asset_type}</span>
+                                ${asset.accreditation_required ? '<span class="accredited-badge"><i class="bi bi-star-fill"></i> VIP</span>' : ''}
+                            </div>
+                            <h5 class="card-title">${asset.name}</h5>
+                            <p class="text-muted small mb-2">${asset.symbol}</p>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fs-5 fw-bold text-es-blue">$${asset.valuation.toLocaleString()}</span>
+                                <span class="risk-badge risk-${asset.risk_level}">Risk ${asset.risk_level}</span>
+                            </div>
+                            <div class="d-flex justify-content-between small text-muted">
+                                <span><i class="bi bi-box"></i> ${asset.available_shares.toLocaleString()} available</span>
+                                <span>Min: $${asset.minimum_investment}</span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <button class="btn btn-primary w-100">View Details</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Initialize mini charts
+            assets.forEach(asset => {
+                if (asset.price_history && asset.price_history.length > 0) {
+                    initMiniChart(asset.id, asset.price_history);
+                }
+            });
+
+            // Update pagination buttons
+            // Note: Since renderPagination logic in this file seems to calculate based on limit/count, 
+            // I will stick to what it was or improve it if I can access totalAssets. 
+            // The previous code block showed: renderPagination(limit, assets.length);
+            // But I updated `totalAssets` in the first chunk, so let's use it if available or fallback.
+            renderPagination(limit, assets.length);
+        } catch (e) {
+            console.error('Failed to load assets:', e);
+            container.innerHTML = '<div class="col-12 text-center text-danger py-5"><i class="bi bi-exclamation-circle display-4"></i><p>Failed to load assets</p></div>';
+        }
+    }
+
+    function initMiniChart(id, data) {
+        const ctx = document.getElementById(`miniChart-${id}`);
+        if (!ctx) return;
+
+        // Destroy existing chart if any
+        if (chartInstances[id]) {
+            chartInstances[id].destroy();
+        }
+
+        const isPositive = data[data.length - 1] >= data[0];
+        const color = isPositive ? '#10b981' : '#ef4444'; // Green or Red
+
+        chartInstances[id] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(data.length).fill(''),
+                datasets: [{
+                    data: data,
+                    borderColor: color,
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    fill: {
+                        target: 'origin',
+                        above: isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+                    }
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: false,
+                        min: Math.min(...data) * 0.99,
+                        max: Math.max(...data) * 1.01
+                    }
+                },
+                layout: { padding: 5 },
+                events: [] // Disable interactions for performance
+            }
+        });
+    }
+
+
+
+    // Render pagination controls
+    function renderPagination(limit, currentCount) {
+        const paginationNav = document.getElementById('paginationNav');
+        const pagination = document.getElementById('pagination');
+
+        // Calculate total pages (estimate if we got a full page)
+        const hasMore = currentCount === limit;
+        const totalPages = hasMore ? currentPage + 1 : currentPage;
+
+        if (totalPages <= 1 && currentPage === 1) {
+            paginationNav.style.display = 'none';
+            return;
+        }
+
+        paginationNav.style.display = 'block';
+
+        let html = '';
+
+        // Previous button
+        html += `
+            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">
+                    <i class="bi bi-chevron-left"></i> Prev
+                </a>
+            </li>
+        `;
+
+        // Page numbers
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(currentPage + 2, totalPages);
+
+        for (let i = startPage; i <= endPage; i++) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+                </li>
+            `;
+        }
+
+        // Next button
+        html += `
+            <li class="page-item ${!hasMore ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">
+                    Next <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+        `;
+
+        pagination.innerHTML = html;
+    }
+
+    // Load market stats
+    async function loadStats() {
+        try {
+            const stats = await apiGet('/api/v1/store/stats');
+            totalAssets = stats.total_assets;
+            document.getElementById('totalAssets').textContent = stats.total_assets;
+            document.getElementById('marketCap').textContent = '$' + (stats.total_market_cap / 1000000).toFixed(1) + 'M';
+            document.getElementById('volume24h').textContent = '$' + stats.total_volume_24h.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        } catch (e) {
+            console.error('Failed to load stats:', e);
+        }
+    }
+
+    // Reset filters
+    function resetFilters() {
+        document.getElementById('filterType').value = '';
+        document.getElementById('filterRisk').value = '';
+        document.getElementById('sortBy').value = 'name';
+        document.getElementById('orderAsc').checked = true;
+        document.getElementById('pageSize').value = '20';
+        currentPage = 1;
+        loadAssets();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAssetTypeFilter();
+        loadStats();
+        loadAssets();
+    });
+</script>
+{% endblock %}

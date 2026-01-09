@@ -1,0 +1,597 @@
+{% extends 'base.html' %}
+
+{% block title %}Asset Detail{% endblock %}
+
+{% block extra_css %}
+<style>
+    .asset-row {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .chart-col {
+        display: flex;
+    }
+
+    .price-chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        flex-shrink: 0;
+    }
+
+    .chart-wrapper {
+        flex: 1;
+        position: relative;
+        min-height: 300px;
+    }
+
+    .live-indicator {
+        display: flex;
+        align-items: center;
+        font-size: 0.75rem;
+        color: #10b981;
+    }
+
+    .live-dot {
+        width: 8px;
+        height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+        margin-right: 6px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+
+    .info-col {
+        display: flex;
+        flex-direction: column;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div id="assetContent">
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+    const assetId = {{ asset_id }};
+    let priceChart = null;
+    let refreshInterval = null;
+
+    // Get refresh interval from environment (default 60 seconds)
+    const REFRESH_INTERVAL = 60000; // 60 seconds
+
+    async function loadAsset() {
+        const container = document.getElementById('assetContent');
+
+        try {
+            const asset = await apiGet(`/api/v1/store/assets/${assetId}`);
+            window.currentAsset = asset;
+            const history = await apiGet(`/api/v1/store/assets/${assetId}/price-history?days=30`);
+
+            container.innerHTML = `
+                <nav aria-label="breadcrumb" class="mb-4">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item"><a href="/marketplace/">Marketplace</a></li>
+                        <li class="breadcrumb-item active">${asset.symbol}</li>
+                    </ol>
+                </nav>
+                
+                <div class="row asset-row">
+                    <div class="col-lg-6 chart-col mb-4">
+                        <!-- Price Chart -->
+                        <div class="price-chart-container">
+                            <div class="chart-header">
+                                <h6 class="mb-0"><i class="bi bi-graph-up text-es-blue"></i> Price History (30 Days)</h6>
+                                <div class="live-indicator">
+                                    <span class="live-dot"></span>
+                                    <span>Live • Updates every 60s</span>
+                                </div>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="priceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 info-col mb-4">
+                        <div class="d-flex align-items-start mb-3">
+                            <span class="asset-type-badge me-2">${asset.asset_type}</span>
+                            ${asset.accreditation_required ? '<span class="accredited-badge"><i class="bi bi-star-fill"></i> Accredited Investors Only</span>' : ''}
+                        </div>
+                        
+                        <h1 class="mb-2">${asset.name}</h1>
+                        <h4 class="text-muted mb-4">${asset.symbol}</h4>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-4">
+                                <div class="stat-card">
+                                    <div class="stat-label">Price per Share</div>
+                                    <div class="stat-value" id="currentPrice">$${asset.valuation.toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-card">
+                                    <div class="stat-label">Market Cap</div>
+                                    <div class="stat-value" id="marketCap">$${(asset.market_cap / 1000000).toFixed(1)}M</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-card bg-primary text-white">
+                                    <div class="stat-label text-white-50">Your Position</div>
+                                    <div class="stat-value text-white" id="userShares">${asset.user_shares ? parseFloat(asset.user_shares).toFixed(3) : '0.000'}</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-card text-center">
+                                    <div class="stat-label">Risk Level</div>
+                                    <span class="risk-badge risk-${asset.risk_level} fs-5">${asset.risk_level}/5</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-card text-center">
+                                    <div class="stat-label">Available</div>
+                                    <div class="fw-bold">${asset.available_shares.toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-card text-center">
+                                    <div class="stat-label">Min Investment</div>
+                                    <div class="fw-bold">$${asset.minimum_investment}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <p class="text-muted">${asset.description}</p>
+                        
+                        <div class="row g-2 mt-4">
+                            <div class="col-6">
+                                <button class="btn btn-warning w-100 btn-lg" onclick="showBuyModal()">
+                                    <i class="bi bi-cart-plus"></i> Invest
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-outline-danger w-100 btn-lg" onclick="showSellModal()">
+                                    <i class="bi bi-currency-dollar"></i> Sell
+                                </button>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2 mt-2">
+                            <a href="/marketplace/" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-left"></i> Back to Marketplace
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Price History Table -->
+                <div class="card mt-5">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-table"></i> Recent Price Data</span>
+                        <small class="text-muted">Last 30 entries</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover" id="priceTable">
+                                <thead>
+                                    <tr><th>Date</th><th>Price</th><th>Change</th><th>Volume</th></tr>
+                                </thead>
+                                <tbody id="priceTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Initialize chart with history data
+            initChart(history);
+            updatePriceTable(history);
+
+            // Start auto-refresh
+            startAutoRefresh();
+
+        } catch (e) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+                    <h3 class="mt-3">Asset Not Found</h3>
+                    <a href="/marketplace/" class="btn btn-primary mt-3">Back to Marketplace</a>
+                </div>
+            `;
+        }
+    }
+
+    function initChart(history) {
+        const ctx = document.getElementById('priceChart').getContext('2d');
+
+        // Take last 30 data points
+        const data = history.slice(-30);
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+        gradient.addColorStop(0, 'rgba(30, 64, 175, 0.3)');
+        gradient.addColorStop(1, 'rgba(30, 64, 175, 0.0)');
+
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => {
+                    // Show Month-Day Hour:Minute for live view
+                    const date = new Date(d.date);
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }),
+                datasets: [{
+                    label: 'Price ($)',
+                    data: data.map(d => d.price),
+                    borderColor: '#1e40af',
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: '#1e40af',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `$${context.parsed.y.toFixed(2)}`
+                        }
+                    }
+                },
+                layout: {
+                    padding: {
+                        bottom: 10
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        grid: { display: false },
+                        ticks: {
+                            maxTicksLimit: 5,
+                            maxRotation: 0,
+                            minRotation: 0,
+                            font: { size: 10 },
+                            padding: 5
+                        }
+                    },
+                    y: {
+                        display: true,
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        ticks: {
+                            callback: (value) => '$' + value.toFixed(0),
+                            font: { size: 10 },
+                            padding: 5
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+    }
+
+    function updatePriceTable(history) {
+        const tbody = document.getElementById('priceTableBody');
+        const data = history.slice(-30).reverse();
+
+        tbody.innerHTML = data.map((row, i) => {
+            const prevPrice = i < data.length - 1 ? data[i + 1].price : row.price;
+            const change = ((row.price - prevPrice) / prevPrice * 100);
+            const changeClass = change >= 0 ? 'text-success' : 'text-danger';
+            const changeIcon = change >= 0 ? '↑' : '↓';
+
+            return `
+                <tr>
+                    <td>${new Date(row.date).toLocaleString()}</td>
+                    <td class="fw-bold">$${row.price.toFixed(2)}</td>
+                    <td class="${changeClass}">${changeIcon} ${Math.abs(change).toFixed(2)}%</td>
+                    <td>${row.volume.toLocaleString()}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function refreshData() {
+        try {
+            // Refresh asset details
+            const assetData = await apiGet(`/api/v1/store/assets/${assetId}`);
+            window.currentAsset = assetData;
+
+            // Update stats
+            document.getElementById('currentPrice').textContent = '$' + assetData.valuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+            document.getElementById('marketCap').textContent = '$' + (assetData.market_cap / 1000000).toFixed(1) + 'M';
+            document.getElementById('userShares').textContent = assetData.user_shares ? parseFloat(assetData.user_shares).toFixed(3) : '0.000';
+
+            // Refresh chart and table data
+            const history = await apiGet(`/api/v1/store/assets/${assetId}/price-history?days=30`);
+
+            // Update chart
+            const data = history.slice(-30);
+            priceChart.data.labels = data.map(d => {
+                const date = new Date(d.date);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            });
+            priceChart.data.datasets[0].data = data.map(d => d.price);
+            priceChart.update('none');
+
+            // Update table
+            updatePriceTable(history);
+
+            console.log('Price data refreshed at', new Date().toLocaleTimeString());
+        } catch (e) {
+            console.error('Failed to refresh price data:', e);
+        }
+    }
+
+    function startAutoRefresh() {
+        // Clear any existing interval
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+
+        // Refresh every 60 seconds (same as price fluctuation service)
+        refreshInterval = setInterval(refreshData, REFRESH_INTERVAL);
+        console.log('Auto-refresh started (every 60s)');
+    }
+
+    // Modals Logic
+    let currentBalance = 0;
+
+    function checkLogin() {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            new bootstrap.Modal(document.getElementById('loginModal')).show();
+            return false;
+        }
+        return token;
+    }
+
+    async function showBuyModal() {
+        if (!checkLogin()) return;
+        const asset = window.currentAsset;
+
+        try {
+            const balData = await apiGet('/commands/ledger/balance/');
+            currentBalance = parseFloat(balData.balance);
+        } catch (e) { currentBalance = 0; }
+
+        document.getElementById('buyAssetSymbol').textContent = asset.symbol;
+        document.getElementById('buyPriceDisplay').textContent = '$' + asset.valuation.toLocaleString();
+        document.getElementById('buyUserBalance').textContent = '$' + currentBalance.toLocaleString();
+
+        const maxShares = currentBalance / asset.valuation;
+        document.getElementById('buyMaxShares').textContent = Math.floor(maxShares * 100000) / 100000;
+
+        document.getElementById('buySharesInput').value = '';
+        document.getElementById('buyTotalCost').textContent = '$0.00';
+        document.getElementById('buyError').classList.add('d-none');
+
+        new bootstrap.Modal(document.getElementById('buyModal')).show();
+    }
+
+    function updateBuyCost() {
+        const shares = parseFloat(document.getElementById('buySharesInput').value) || 0;
+        const cost = shares * window.currentAsset.valuation;
+        document.getElementById('buyTotalCost').textContent = '$' + cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        if (cost > currentBalance) {
+            document.getElementById('buyTotalCost').classList.add('text-danger');
+        } else {
+            document.getElementById('buyTotalCost').classList.remove('text-danger');
+        }
+    }
+
+    function setMaxBuy() {
+        const max = currentBalance / window.currentAsset.valuation;
+        document.getElementById('buySharesInput').value = (max * 0.999).toFixed(8);
+        updateBuyCost();
+    }
+
+    async function confirmBuy() {
+        const shares = parseFloat(document.getElementById('buySharesInput').value);
+        if (!shares || shares <= 0) {
+            document.getElementById('buyError').textContent = 'Invalid amount';
+            document.getElementById('buyError').classList.remove('d-none');
+            return;
+        }
+
+        const cost = shares * window.currentAsset.valuation;
+        if (cost > currentBalance) {
+            document.getElementById('buyError').textContent = 'Insufficient funds';
+            document.getElementById('buyError').classList.remove('d-none');
+            return;
+        }
+
+        const token = localStorage.getItem('access_token');
+        try {
+            const response = await fetch('/commands/invest/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ asset_id: window.currentAsset.id, shares: shares })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed');
+
+            bootstrap.Modal.getInstance(document.getElementById('buyModal')).hide();
+            showToast('Investment successful!', 'success');
+            refreshData();
+            if (window.updateBalance) window.updateBalance();
+        } catch (e) {
+            document.getElementById('buyError').textContent = e.message;
+            document.getElementById('buyError').classList.remove('d-none');
+        }
+    }
+
+    async function showSellModal() {
+        if (!checkLogin()) return;
+        const asset = window.currentAsset;
+        const owned = asset.user_shares || 0;
+
+        document.getElementById('sellAssetSymbol').textContent = asset.symbol;
+        document.getElementById('sellPriceDisplay').textContent = '$' + asset.valuation.toLocaleString();
+        document.getElementById('sellUserShares').textContent = owned;
+
+        document.getElementById('sellSharesInput').value = '';
+        document.getElementById('sellTotalValue').textContent = '$0.00';
+        document.getElementById('sellError').classList.add('d-none');
+
+        new bootstrap.Modal(document.getElementById('sellModal')).show();
+    }
+
+    function updateSellValue() {
+        const shares = parseFloat(document.getElementById('sellSharesInput').value) || 0;
+        const val = shares * window.currentAsset.valuation;
+        document.getElementById('sellTotalValue').textContent = '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2 });
+    }
+
+    function setMaxSell() {
+        const owned = window.currentAsset.user_shares || 0;
+        document.getElementById('sellSharesInput').value = owned;
+        updateSellValue();
+    }
+
+    async function confirmSell() {
+        const shares = parseFloat(document.getElementById('sellSharesInput').value);
+        if (!shares || shares <= 0) return;
+
+        const token = localStorage.getItem('access_token');
+        try {
+            const response = await fetch('/commands/divest/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ asset_id: window.currentAsset.id, shares: shares })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed');
+
+            bootstrap.Modal.getInstance(document.getElementById('sellModal')).hide();
+            showToast('Shares sold successfully!', 'success');
+            refreshData();
+            if (window.updateBalance) window.updateBalance();
+        } catch (e) {
+            document.getElementById('sellError').textContent = e.message;
+            document.getElementById('sellError').classList.remove('d-none');
+        }
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', loadAsset);
+</script>
+<!-- Buy Modal -->
+<div class="modal fade" id="buyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title text-dark"><i class="bi bi-cart-plus"></i> Invest in <span
+                        id="buyAssetSymbol"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Current Price: <span class="fw-bold" id="buyPriceDisplay"></span></p>
+                <p>Your Balance: <span class="fw-bold" id="buyUserBalance"></span></p>
+                <div class="mb-3">
+                    <label class="form-label">Shares to Buy</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="buySharesInput" step="0.00000001" min="0.00000001"
+                            oninput="updateBuyCost()">
+                        <button class="btn btn-outline-secondary" type="button" onclick="setMaxBuy()">Max</button>
+                    </div>
+                    <div class="form-text mt-2">
+                        Total Cost: <span id="buyTotalCost" class="fw-bold">$0.00</span>
+                        <br>
+                        Max Affordable: <span id="buyMaxShares">0</span> shares
+                    </div>
+                </div>
+                <div class="alert alert-danger d-none" id="buyError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning fw-bold" onclick="confirmBuy()">Confirm Investment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sell Modal -->
+<div class="modal fade" id="sellModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-currency-dollar"></i> Sell <span id="sellAssetSymbol"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Current Price: <span class="fw-bold" id="sellPriceDisplay"></span></p>
+                <p>Your Position: <span class="fw-bold" id="sellUserShares"></span> shares</p>
+                <div class="mb-3">
+                    <label class="form-label">Shares to Sell</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="sellSharesInput" step="0.00000001"
+                            min="0.00000001" oninput="updateSellValue()">
+                        <button class="btn btn-outline-secondary" type="button" onclick="setMaxSell()">Max</button>
+                    </div>
+                    <div class="form-text mt-2">
+                        Total Value: <span id="sellTotalValue" class="fw-bold">$0.00</span>
+                    </div>
+                </div>
+                <div class="alert alert-danger d-none" id="sellError"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger fw-bold" onclick="confirmSell()">Confirm Sell</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

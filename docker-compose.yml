@@ -1,0 +1,68 @@
+# EquiShard - Docker Compose for Local Development
+
+services:
+  web:
+    build:
+      context: .
+      target: production
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgres://equishard:equishard@db:5432/equishard
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: >
+      sh -c "python manage.py migrate &&
+             gunicorn equishard.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --reload"
+
+  # Price Fluctuation Background Service
+  price_fluctuation:
+    build:
+      context: .
+      target: production
+    environment:
+      - DATABASE_URL=postgres://equishard:equishard@db:5432/equishard
+      - SECRET_KEY=dev-secret-key-change-in-production
+      # Price fluctuation settings
+      - PRICE_FLUCTUATION_INTERVAL=${PRICE_FLUCTUATION_INTERVAL:-60}
+      - PRICE_FLUCTUATION_MIN=${PRICE_FLUCTUATION_MIN:--0.05}
+      - PRICE_FLUCTUATION_MAX=${PRICE_FLUCTUATION_MAX:-0.05}
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: python manage.py price_fluctuation
+    restart: unless-stopped
+    profiles:
+      - with-fluctuation
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=equishard
+      - POSTGRES_PASSWORD=equishard
+      - POSTGRES_DB=equishard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U equishard -d equishard" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+
