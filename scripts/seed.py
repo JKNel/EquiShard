@@ -137,6 +137,20 @@ def create_users(tenants: list[Tenant]) -> list[User]:
     return users
 
 
+def create_admin():
+    """Create a superuser for administration."""
+    print("\nCheck/Create Admin User...")
+    if not User.objects.filter(username="admin").exists():
+        User.objects.create_superuser(
+            username="admin",
+            email="admin@equishard.com",
+            password="password123"
+        )
+        print("  ✓ Created superuser: admin")
+    else:
+        print("  ✓ Admin user already exists")
+
+
 def create_assets(tenants: list[Tenant]) -> list[Asset]:
     """Create assets for each tenant."""
     print("\nCreating assets...")
@@ -260,6 +274,7 @@ def seed():
     
     tenants = create_tenants()
     users = create_users(tenants)
+    create_admin()
     assets = create_assets(tenants)
     create_price_history(assets)
     simulate_trades(users, assets)

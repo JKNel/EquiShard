@@ -21,7 +21,7 @@ A **Fractional Investment Marketplace** demonstrating advanced patterns: **DDD**
 └─────────────────────┘      └─────────────────────────────────┘
                     ↘          ↙
               ┌─────────────────────┐
-              │   PostgreSQL / Supabase   │
+              │   PostgreSQL    │
               └─────────────────────┘
 ```
 
