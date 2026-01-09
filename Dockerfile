@@ -59,8 +59,9 @@ USER appuser
 EXPOSE 8000
 
 # Health check
+# Health check (Conditional: Pass if Worker, Check URL if Web)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')" || exit 1
+    CMD if [ "$RUN_WORKER" = "true" ]; then exit 0; else python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/')" || exit 1; fi
 
-# Run with Gunicorn + Uvicorn workers for ASGI
-CMD ["gunicorn", "equishard.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--workers", "2", "--access-logfile", "-", "--error-logfile", "-"]
+# Run script (Worker) or Server (Web) based on ENV
+CMD ["/bin/bash", "-c", "if [ \"$RUN_WORKER\" = \"true\" ]; then echo 'Starting Worker...'; python manage.py price_fluctuation; else echo 'Starting Web App...'; exec gunicorn equishard.asgi:application -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers 2 --access-logfile - --error-logfile -; fi"]
