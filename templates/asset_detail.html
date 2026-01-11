@@ -139,37 +139,37 @@
                         <h4 class="text-muted mb-4">${asset.symbol}</h4>
                         
                         <div class="row g-3 mb-4">
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card">
                                     <div class="stat-label">Price per Share</div>
                                     <div class="stat-value" id="currentPrice">$${asset.valuation.toLocaleString()}</div>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card">
                                     <div class="stat-label">Market Cap</div>
                                     <div class="stat-value" id="marketCap">$${(asset.market_cap / 1000000).toFixed(1)}M</div>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card bg-primary text-white">
                                     <div class="stat-label text-white-50">Your Position</div>
                                     <div class="stat-value text-white" id="userShares">${asset.user_shares ? parseFloat(asset.user_shares).toFixed(3) : '0.000'}</div>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card text-center">
                                     <div class="stat-label">Risk Level</div>
                                     <span class="risk-badge risk-${asset.risk_level} fs-5">${asset.risk_level}/5</span>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card text-center">
                                     <div class="stat-label">Available</div>
                                     <div class="fw-bold">${asset.available_shares.toLocaleString()}</div>
                                 </div>
                             </div>
-                            <div class="col-4">
+                            <div class="col-6 col-md-4">
                                 <div class="stat-card text-center">
                                     <div class="stat-label">Min Investment</div>
                                     <div class="fw-bold">$${asset.minimum_investment}</div>
