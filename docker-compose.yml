@@ -34,6 +34,7 @@ services:
       - PRICE_FLUCTUATION_INTERVAL=${PRICE_FLUCTUATION_INTERVAL:-60}
       - MAX_INCREASE_PERCENTAGE=${MAX_INCREASE_PERCENTAGE:-5}
       - MAX_DECREASE_PERCENTAGE=${MAX_DECREASE_PERCENTAGE:-5}
+      - RESET_PRICES=${RESET_PRICES:-false}
     depends_on:
       db:
         condition: service_healthy

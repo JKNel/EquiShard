@@ -55,6 +55,7 @@ You can configure the price fluctuation service using the following environment 
 | `PRICE_FLUCTUATION_INTERVAL` | `60` | Interval in seconds between price updates |
 | `MAX_INCREASE_PERCENTAGE` | `5` | Maximum percentage a price can increase per interval (5 = 5%) |
 | `MAX_DECREASE_PERCENTAGE` | `5` | Maximum percentage a price can decrease per interval (5 = 5%) |
+| `RESET_PRICES` | `false` | If `true`, resets all asset prices to initial seed values on startup |
 
 
 ### Local Development

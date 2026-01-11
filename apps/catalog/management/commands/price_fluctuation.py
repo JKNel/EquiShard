@@ -48,6 +48,11 @@ class Command(BaseCommand):
             help=f'Maximum price change percentage (default: {default_max:.4f} from {env_max}%)'
         )
         parser.add_argument(
+            '--reset-prices',
+            action='store_true',
+            help='Reset all asset prices to their initial seed values (also triggered by RESET_PRICES=true env var)'
+        )
+        parser.add_argument(
             '--once',
             action='store_true',
             help='Run only once instead of continuously'
@@ -58,12 +63,20 @@ class Command(BaseCommand):
         min_change = options['min_change']
         max_change = options['max_change']
         run_once = options['once']
+        
+        # Check env var for reset flag (string 'true' case insensitive)
+        env_reset = os.getenv('RESET_PRICES', 'false').lower() == 'true'
+        should_reset = options['reset_prices'] or env_reset
 
         self.stdout.write(self.style.SUCCESS(
             f'Starting Price Fluctuation Service\n'
             f'  Interval: {interval}s\n'
             f'  Range: {min_change*100:.0f}% to {max_change*100:.0f}%'
         ))
+        
+        if should_reset:
+            self.stdout.write(self.style.WARNING('RESET_PRICES is True. Resetting asset prices to initial values...'))
+            self.reset_prices()
 
         while True:
             try:
@@ -129,3 +142,45 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Updated {updated_count} asset prices at {datetime.now().strftime("%H:%M:%S")}'
         ))
+
+    @transaction.atomic
+    def reset_prices(self):
+        """Reset all asset prices to their initial values defined in shared initial_data."""
+        from apps.catalog.models import Asset, AssetPriceHistory
+        from apps.catalog.initial_data import ASSET_TEMPLATES
+        from datetime import datetime
+        
+        self.stdout.write('Resetting prices...')
+        assets = Asset.objects.all()
+        reset_count = 0
+        history_records = []
+        
+        # Create a lookup map for faster access: Name -> Initial Value
+        initial_values = {t['name']: Decimal(t['valuation']) for t in ASSET_TEMPLATES}
+        
+        for asset in assets:
+            if asset.name in initial_values:
+                original_value = initial_values[asset.name]
+                
+                # Update if different
+                if asset.valuation != original_value:
+                    old_price = asset.valuation
+                    asset.valuation = original_value
+                    asset.save(update_fields=['valuation', 'updated_at'])
+                    
+                    self.stdout.write(f"  ✓ Reset {asset.symbol}: ${old_price} -> ${original_value}")
+                    
+                    # Record this reset event in history
+                    history_records.append(AssetPriceHistory(
+                        asset=asset,
+                        price=asset.valuation,
+                        volume=Decimal("0"),
+                        recorded_at=datetime.now()
+                    ))
+                    reset_count += 1
+        
+        if history_records:
+            AssetPriceHistory.objects.bulk_create(history_records)
+            
+        self.stdout.write(self.style.SUCCESS(f'Successfully reset {reset_count} assets to initial prices.'))
+
