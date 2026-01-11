@@ -32,8 +32,8 @@ services:
       - SECRET_KEY=dev-secret-key-change-in-production
       # Price fluctuation settings
       - PRICE_FLUCTUATION_INTERVAL=${PRICE_FLUCTUATION_INTERVAL:-60}
-      - PRICE_FLUCTUATION_MIN=${PRICE_FLUCTUATION_MIN:--0.05}
-      - PRICE_FLUCTUATION_MAX=${PRICE_FLUCTUATION_MAX:-0.05}
+      - MAX_INCREASE_PERCENTAGE=${MAX_INCREASE_PERCENTAGE:-5}
+      - MAX_DECREASE_PERCENTAGE=${MAX_DECREASE_PERCENTAGE:-5}
     depends_on:
       db:
         condition: service_healthy

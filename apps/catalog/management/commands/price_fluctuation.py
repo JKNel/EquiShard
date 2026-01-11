@@ -24,17 +24,28 @@ class Command(BaseCommand):
             default=int(os.getenv('PRICE_FLUCTUATION_INTERVAL', '60')),
             help='Interval in seconds between price updates (default: 60)'
         )
+
+        # Get defaults from env or use safe defaults (5%)
+        # These are expected to be integers or floats representing percentages (e.g. 5 for 5%)
+        env_max = float(os.getenv('MAX_INCREASE_PERCENTAGE', '5'))
+        env_min = float(os.getenv('MAX_DECREASE_PERCENTAGE', '5'))
+
+        # Convert to decimal for calculation (5 -> 0.05)
+        default_max = env_max / 100.0
+        # For decrease, we want the negative value (5 -> -0.05)
+        default_min = -(env_min / 100.0)
+
         parser.add_argument(
             '--min-change',
             type=float,
-            default=float(os.getenv('PRICE_FLUCTUATION_MIN', '-1.0')),
-            help='Minimum price change percentage (default: -100%)'
+            default=default_min,
+            help=f'Minimum price change percentage (default: {default_min:.4f} from negative {env_min}%)'
         )
         parser.add_argument(
             '--max-change',
             type=float,
-            default=float(os.getenv('PRICE_FLUCTUATION_MAX', '1.0')),
-            help='Maximum price change percentage (default: +100%)'
+            default=default_max,
+            help=f'Maximum price change percentage (default: {default_max:.4f} from {env_max}%)'
         )
         parser.add_argument(
             '--once',
