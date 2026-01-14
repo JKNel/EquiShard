@@ -74,3 +74,38 @@ from apps.users.serializers import CustomTokenObtainPairSerializer
 class CustomTokenObtainPairView(TokenObtainPairView):
     """Custom auth view returning user flags."""
     serializer_class = CustomTokenObtainPairSerializer
+
+
+from equishard.services.leaderboard import get_leaderboard_data
+
+class LeaderboardView(APIView):
+    """Get leaderboard data including user rank."""
+    permission_classes = [AllowAny]  # Allow viewing leaderboard without login, but rank needs auth context
+
+    def get(self, request: Request) -> Response:
+        # Pass user regardless of auth state; service handles it.
+        # But if request.user is authenticated via JWT (handled by DRF), it works.
+        data = get_leaderboard_data(current_user=request.user, limit=10)
+        
+        # Serialize the data manually since it's a mix of dicts and models
+        response_data = {
+            'top_users': [
+                {
+                    'rank': entry['rank'],
+                    'username': entry['username'],
+                    'profit_loss': entry['profit_loss'],
+                    'is_current_user': entry['username'] == request.user.username if request.user.is_authenticated else False
+                }
+                for entry in data['top_users']
+            ]
+        }
+        
+        if 'user_rank' in data:
+            user_entry = data['user_rank']
+            response_data['user_rank'] = {
+                'rank': user_entry['rank'],
+                'username': user_entry['username'],
+                'profit_loss': user_entry['profit_loss']
+            }
+            
+        return Response(response_data)

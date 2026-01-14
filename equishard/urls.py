@@ -14,7 +14,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from equishard.views import home, marketplace, dashboard, asset_detail
+from equishard.views import home, marketplace, dashboard, asset_detail, leaderboard
 from apps.users.views import CustomTokenObtainPairView
 
 
@@ -28,6 +28,7 @@ urlpatterns = [
     path('', home, name='home'),
     path('marketplace/', marketplace, name='marketplace'),
     path('dashboard/', dashboard, name='dashboard'),
+    path('leaderboard/', leaderboard, name='leaderboard'),
     path('asset/<int:asset_id>/', asset_detail, name='asset_detail'),
     
     # Health check

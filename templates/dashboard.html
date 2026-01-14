@@ -43,6 +43,14 @@
             </div>
             <div class="col-6 col-md-3">
                 <div class="stat-card">
+                    <div class="stat-label">Leaderboard</div>
+                    <div class="stat-value text-es-blue" id="userRankDisplay">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
                     <div class="stat-label">Positions</div>
                     <div class="stat-value text-es-yellow" id="positionsCount">0</div>
                 </div>
@@ -158,12 +166,32 @@
             const positions = await apiGet('/api/v1/analytics/positions');
             renderPositions(positions);
 
+            // Load Leaderboard Rank
+            await loadLeaderboardRank();
+
         } catch (e) {
             console.error('Failed to load dashboard:', e);
             if (e.message.includes('401')) {
                 showToast('Session expired. Please log in again.', 'error');
                 logout();
             }
+        }
+    }
+
+    // Load leaderboard rank via API
+    async function loadLeaderboardRank() {
+        try {
+            const data = await apiGet('/commands/users/leaderboard/');
+            const rankEl = document.getElementById('userRankDisplay');
+
+            if (data.user_rank) {
+                rankEl.textContent = '#' + data.user_rank.rank;
+                rankEl.className = 'stat-value text-es-blue';
+            } else {
+                rankEl.innerHTML = '<span class="fs-6 text-muted">No Rank</span>';
+            }
+        } catch (e) {
+            console.error('Failed to load leaderboard:', e);
         }
     }
 
