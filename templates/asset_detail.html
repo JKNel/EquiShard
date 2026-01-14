@@ -94,7 +94,7 @@
     let refreshInterval = null;
 
     // Get refresh interval from environment (default 60 seconds)
-    const REFRESH_INTERVAL = 60000; // 60 seconds
+    const REFRESH_INTERVAL = {{ asset_update_interval }} * 1000; // converted to ms
 
     async function loadAsset() {
         const container = document.getElementById('assetContent');
@@ -121,7 +121,7 @@
                                 <h6 class="mb-0"><i class="bi bi-graph-up text-es-blue"></i> Price History</h6>
                                 <div class="live-indicator">
                                     <span class="live-dot"></span>
-                                    <span>Live • Updates every 60s</span>
+                                    <span>Live • Updates every {{ update_interval_minutes }} min</span>
                                 </div>
                             </div>
                             <div class="chart-wrapper">
